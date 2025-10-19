@@ -39,15 +39,17 @@ pub struct Move {
     pub to: Square,
     pub piece: Piece,
     pub promotion: Option<PieceKind>,
+    pub captures: Option<Piece>,
 }
 
 impl Move {
-    pub fn new(from: Square, to: Square, piece: Piece) -> Self {
+    pub fn new(from: Square, to: Square, piece: Piece, promotion:Option<PieceKind>, captures: Option<Piece>) -> Self {
         Self {
             from,
             to,
             piece,
-            promotion: None,
+            promotion,
+            captures,
         }
     }
 }
