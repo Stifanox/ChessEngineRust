@@ -1,10 +1,10 @@
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Color {
     White,
     Black,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum PieceKind {
     Pawn,
     Knight,
@@ -14,7 +14,7 @@ pub enum PieceKind {
     King,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct Piece {
     pub color: Color,
     pub kind: PieceKind,
@@ -30,6 +30,24 @@ impl Square {
 
     pub fn to_coords(&self) -> (u8, u8) {
         (self.0 / 8, self.0 % 8)
+    }
+
+    pub fn to_notation(&self) -> String {
+        let file = (self.0 % 8) as u8 + b'a';
+        let rank = (self.0 / 8) as u8 + b'1';
+        format!("{}{}", file as char, rank as char)
+    }
+
+    pub fn from_notation(s: &str) -> Option<Self> {
+        if s.len() != 2 {
+            return None;
+        }
+        let file = s.chars().nth(0)? as u8 - b'a';
+        let rank = s.chars().nth(1)? as u8 - b'1';
+        if file > 7 || rank > 7 {
+            return None;
+        }
+        Some(Self::from_coords(file, rank))
     }
 }
 
@@ -52,4 +70,11 @@ impl Move {
             captures,
         }
     }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum GameState {
+    InProgress,
+    Checkmate,
+    Stalemate,
 }

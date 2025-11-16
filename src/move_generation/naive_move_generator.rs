@@ -1,6 +1,6 @@
-use std::time::Instant;
 use crate::board::types::{Color, Move, PieceKind, Square};
 use crate::board::{BitboardBoard, Board};
+use crate::board::bitboard::{CASTLE_BLACK_KINGSIDE, CASTLE_BLACK_QUEENSIDE, CASTLE_WHITE_KINGSIDE, CASTLE_WHITE_QUEENSIDE};
 use crate::move_generation::BitboardMoveGenerator;
 pub struct NaiveMoveGenerator;
 
@@ -103,12 +103,23 @@ impl NaiveMoveGenerator {
             }
         }
 
+        let from_file = square % 8;
+
         let diagonal_shifts: [i8; 2] = [7, 9];
         for shift in diagonal_shifts {
+            if (from_file == 0 && (shift == 7 || (color == Color::Black && shift == 9))) || (from_file == 7 && (shift == 9 || (color == Color::Black && shift == 7))) {
+                continue;
+            }
+
             let dir = if color == Color::White { shift } else { -shift };
             let target = square_i8 + dir;
 
             if target >= 0 && target < 64 {
+                let to_file = target % 8;
+                if (from_file as i8 - to_file as i8).abs() > 1 {
+                    continue;
+                }
+
                 let target_mask = 1u64 << target;
                 if target_mask & enemy != 0 {
                     moves.push(Move {
@@ -118,6 +129,18 @@ impl NaiveMoveGenerator {
                         promotion: None,
                         captures: board.piece_at(Square(target as u8)),
                     });
+                }
+
+                if let Some(ep_sq) = board.en_passant_square {
+                    if target == ep_sq.0 as i8 {
+                        moves.push(Move {
+                            piece: current_piece,
+                            from: Square(square),
+                            to: Square(target as u8),
+                            promotion: None,
+                            captures: board.piece_at(Square(target as u8)),
+                        });
+                    }
                 }
             }
         }
@@ -180,16 +203,15 @@ impl NaiveMoveGenerator {
         for &dir in directions.iter() {
             let mut target = square as i8;
             loop {
+                let from_file = target % 8;
                 target += dir;
                 if target < 0 || target >= 64 {
                     break;
                 }
+                let to_file = target % 8;
 
-                let file_diff = ((square as i8) % 8) - (target % 8);
-                if dir == 7 && file_diff != -1 { break; }
-                if dir == 9 && file_diff != 1 { break; }
-                if dir == -7 && file_diff != 1 { break; }
-                if dir == -9 && file_diff != -1 { break; }
+                if (dir == 7 || dir == -9) && to_file == 7 { break; }
+                if (dir == 9 || dir == -7) && to_file == 0 { break; }
 
                 let target_mask = 1u64 << target;
 
@@ -259,9 +281,12 @@ impl NaiveMoveGenerator {
             let target = square as i8 + offset;
             if target < 0 || target >= 64 { continue; }
 
-            // check edges
-            if (offset == 1 || offset == 9 || offset == -7) && square % 8 == 7 { continue; }
-            if (offset == -1 || offset == 7 || offset == -9) && square % 8 == 0 { continue; }
+            let from_file = square % 8;
+            let to_file = target as u8 % 8;
+
+            if (from_file as i8 - to_file as i8).abs() > 1 {
+                continue;
+            }
 
             let target_mask = 1u64 << target;
             if target_mask & own_mask != 0 { continue; }
@@ -273,6 +298,32 @@ impl NaiveMoveGenerator {
                 promotion: None,
                 captures: if target_mask & enemy_mask != 0 { board.piece_at(Square(target as u8)) } else { None },
             });
+        }
+
+        // Castling
+        let all_pieces = board.get_all_pieces_mask();
+        if color == Color::White {
+            if board.castling_rights & CASTLE_WHITE_KINGSIDE != 0 {
+                if all_pieces & 0x60 == 0 {
+                    moves.push(Move::new(Square(4), Square(6), current_piece, None, None));
+                }
+            }
+            if board.castling_rights & CASTLE_WHITE_QUEENSIDE != 0 {
+                if all_pieces & 0xE == 0 {
+                    moves.push(Move::new(Square(4), Square(2), current_piece, None, None));
+                }
+            }
+        } else {
+            if board.castling_rights & CASTLE_BLACK_KINGSIDE != 0 {
+                if all_pieces & 0x6000000000000000 == 0 {
+                    moves.push(Move::new(Square(60), Square(62), current_piece, None, None));
+                }
+            }
+            if board.castling_rights & CASTLE_BLACK_QUEENSIDE != 0 {
+                if all_pieces & 0xE00000000000000 == 0 {
+                    moves.push(Move::new(Square(60), Square(58), current_piece, None, None));
+                }
+            }
         }
     }
 

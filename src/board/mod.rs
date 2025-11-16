@@ -1,7 +1,6 @@
 pub mod bitboard;
 pub mod types;
 
-use std::panic;
 use types::{Piece, Square, Move};
 
 pub trait Board {
